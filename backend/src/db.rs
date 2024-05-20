@@ -83,7 +83,7 @@ pub async fn add_image(image_url: String, image_data: ImageRequest) -> bool {
 
 // Connect S3 client
 async fn get_s3_client() -> Client {
-    let region_provider = RegionProviderChain::default_provider().or_else("us-east-1");
+    let region_provider = RegionProviderChain::default_provider().or_else("us-west-2");
     let config = aws_config::from_env().region(region_provider).load().await;
     Client::new(&config)
 }
