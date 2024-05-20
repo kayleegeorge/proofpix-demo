@@ -1,13 +1,12 @@
 use dotenv::dotenv;
-use postgres::{Connection, TlsMode};
-use rocket_contrib::{Value, JSON};
+use redis::AsyncCommands;
+use rocket::serde::json::serde_json;
+use rocket::serde::{json::Json, Deserialize, Serialize};
 use std::env;
-use tokio_postgres::{Error, NoTls};
 
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, Clone)]
 #[serde(crate = "rocket::serde")]
-struct Image {
-    id: iu32,
+pub struct Image {
     timestamp: String,
     photo_url: String,
     photo_signature: String,
@@ -16,95 +15,51 @@ struct Image {
     location: String,
 }
 
-// Get a PostgreSQL client
-pub async fn get_db_client() -> tokio_postgres::Client {
+// Connect to Redis
+pub(crate) async fn connect_to_redis() -> redis::RedisResult<redis::aio::Connection> {
     dotenv().ok();
 
-    // Get the database URL from the environment variable
-    let database_url = env::var("DB_URL").expect("DB_URL must be set");
+    let redis_url = env::var("REDIS_URL").expect("REDIS_URL must be set");
 
-    // Connect to the PostgreSQL database
-    let (client, connection) = tokio_postgres::connect(&database_url, NoTls)
+    let client = redis::Client::open(redis_url)?;
+    let connection = client.get_connection().unwrap();
+    Ok(connection)
+}
+
+// Get all images
+pub async fn get_all_images() -> Vec<Image> {
+    let mut con = connect_to_redis()
         .await
-        .expect("DB connection failed");
+        .expect("Failed to connect to Redis");
 
-    // Spawn a new task to manage the connection
-    tokio::spawn(async move {
-        if let Err(e) = connection.await {
-            eprintln!("connection error: {}", e);
-        }
-    });
-
-    client
-}
-
-// Get all images.
-pub fn get_all_images() -> Vec<Image> {
-    let con = get_db_client().unwrap();
-    let rows = &con.query("SELECT * FROM images").unwrap();
     let mut images: Vec<Image> = Vec::new();
 
-    for row in rows {
-        let id: i32 = row.get("id");
-        let timestamp: String = row.get("timestamp");
-        let photo_url: String = row.get("photo_url");
-        let photo_signature: String = row.get("photo_signature");
-        let poster_pubkey: String = row.get("poster_pubkey");
-        let poster_attest_proof: String = row.get("poster_attest_proof");
-        let location: String = row.get("location");
+    let mut iter: redis::AsyncIter<'_, String> =
+        con.scan_match("image:*").expect("Failed to scan keys");
 
-        images.push(Image {
-            id,
-            timestamp,
-            photo_url,
-            photo_signature,
-            poster_pubkey,
-            poster_attest_proof,
-            location,
-        });
+    while let Some(key) = iter.next_item().await {
+        let value: String = con.get(&key).await.expect("Failed to get value from Redis");
+        let image: Image = serde_json::from_str(&value).expect("Failed to deserialize JSON");
+        images.push(image);
     }
 
     images
 }
 
-// Add an image to the database.
-pub async fn add_image(client: &tokio_postgres::Client, image_data: ImageRequest) {
-    let rows_affected = client
-        .execute(
-            "INSERT INTO images (timestamp, photo_url, photo_signature, poster_pubkey, poster_attest_proof, location) VALUES ($1, $2, $3, $4, $5, $6)",
-            &[&image_data.timestamp, &image_data.photo_url, &image_data.photo_signature, &image_data.poster_pubkey, &image_data.poster_attest_proof, &image_data.location],
-        )
-        .await?;
-    Ok(rows_affected > 0)
-}
+// Post an image
+pub async fn post_image(image_data: Json<Image>) -> &'static str {
+    let mut con = connect_to_redis()
+        .await
+        .expect("Failed to connect to Redis");
 
-// Get all images for a specific user
-pub async fn get_images_for_user(client: &tokio_postgres::Client, pub_key: String) -> Vec<Image> {
-    let con = get_db_client().unwrap();
-    let rows = &con
-        .query("SELECT * FROM images WHERE poster_pubkey = $1", &[&pub_key])
-        .unwrap();
-    let mut images: Vec<Image> = Vec::new();
+    // Key with pub key
+    let key = format!("image:{}", image_data.poster_pubkey.clone());
+    let json_data =
+        serde_json::to_string(&image_data.into_inner()).expect("Failed to serialize data");
 
-    for row in rows {
-        let id: i32 = row.get("id");
-        let timestamp: String = row.get("timestamp");
-        let photo_url: String = row.get("photo_url");
-        let photo_signature: String = row.get("photo_signature");
-        let poster_pubkey: String = row.get("poster_pubkey");
-        let poster_attest_proof: String = row.get("poster_attest_proof");
-        let location: String = row.get("location");
+    let _: () = con
+        .set(key, json_data)
+        .expect("Failed to set data in Redis");
 
-        images.push(Image {
-            id,
-            timestamp,
-            photo_url,
-            photo_signature,
-            poster_pubkey,
-            poster_attest_proof,
-            location,
-        });
-    }
-
-    images
+    "Image added successfully"
 }
