@@ -1,4 +1,9 @@
+use dotenv::dotenv;
 use rocket::serde::{json::Json, Deserialize};
+use std::env;
+use tokio_postgres::{Error, NoTls};
+
+use crate::utils::check_and_insert_challenge;
 
 pub mod utils;
 
@@ -12,7 +17,6 @@ fn index() -> &'static str {
 
 #[get("/challenge")]
 fn challenge() -> String {
-    // TODO: store teh challenge in the db.
     return utils::generate_random_challenge();
 }
 
@@ -21,16 +25,42 @@ fn challenge() -> String {
 pub struct AttestationData<'r> {
     attestation_string: &'r str,
     raw_key_id: &'r str,
+    challenge: &'r str, // challenge is user-supplied.
 }
 
 #[post("/appattest", format = "application/json", data = "<attestation_data>")]
-fn appattest(attestation_data: Json<AttestationData<'_>>) -> () {
+async fn appattest(attestation_data: Json<AttestationData<'_>>) -> () {
     const APP_ID: &str = "proof-pix";
-    const challenge: &str = "get-challenge"; // TODO: get challenge from db.
+
+    dotenv().ok();
+
+    // Get the database URL from the environment variable
+    let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
+
+    // Connect to the database
+    let (client, connection) = tokio_postgres::connect(&database_url, NoTls)
+        .await
+        .expect("connection failed");
+
+    // Spawn a new task to run the connection, so we can execute queries on the client
+    tokio::spawn(async move {
+        if let Err(e) = connection.await {
+            eprintln!("connection error: {}", e);
+        }
+    });
+
+    // Check if challenge has already been used
+    match check_and_insert_challenge(&client, attestation_data.challenge).await {
+        Ok(_) => {}
+        Err(e) => {
+            println!("Error checking and inserting challenge: {}", e);
+            return;
+        }
+    };
 
     let verified = app_attest::validate_raw_attestation(
         attestation_data.attestation_string,
-        challenge,
+        attestation_data.challenge,
         attestation_data.raw_key_id,
         APP_ID,
         false, // production
