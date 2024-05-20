@@ -1,6 +1,7 @@
 use db::Image;
-use rocket::serde::json::{self, serde_json};
-use rocket::serde::{self, json::Json, Deserialize, Serialize};
+use rocket::serde::json::Json;
+
+use crate::db::ImageRequest;
 
 pub mod db;
 pub mod utils;
@@ -20,9 +21,10 @@ fn challenge() -> String {
 }
 
 // Post an images
-#[post("/add", format = "application/json", data = "<image_data>")]
-async fn post_image(image_data: Json<ImageRequest>) -> () {
-    let file_name = db::upload_image(image_data).await;
+#[post("/add", format = "application/json", data = "<image_data_json>")]
+async fn post_image(image_data_json: Json<ImageRequest>) -> () {
+    let image_data = image_data_json.into_inner();
+    let file_name = db::upload_image(image_data.clone()).await.unwrap();
 
     // Image to add to Redis
     let image = Image {
@@ -33,7 +35,7 @@ async fn post_image(image_data: Json<ImageRequest>) -> () {
         poster_attest_proof: image_data.poster_attest_proof,
         location: image_data.location,
     };
-    db::post_image(image_data).await;
+    db::post_image(image).await;
 }
 
 // Get all images

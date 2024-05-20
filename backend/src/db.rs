@@ -1,15 +1,11 @@
 use dotenv::dotenv;
-use redis::AsyncCommands;
+use redis::Commands;
 use rocket::serde::json::serde_json;
-use rocket::serde::{json::Json, Deserialize, Serialize};
+use rocket::serde::{Deserialize, Serialize};
 use std::env;
 
 use aws_config::meta::region::RegionProviderChain;
-use aws_sdk_s3::{types::ByteStream, Client};
-use futures::TryStreamExt;
-use rocket::data::{ByteUnit, Data};
-use rocket::http::Status;
-use rocket::response::status;
+use aws_sdk_s3::{ByteStream, Client};
 use sha2::{Digest, Sha256};
 
 #[derive(Deserialize, Serialize, Clone)]
@@ -35,12 +31,12 @@ pub struct Image {
 }
 
 // Connect to Redis
-pub async fn connect_to_redis() -> redis::RedisResult<redis::aio::Connection> {
+pub async fn connect_to_redis() -> redis::RedisResult<redis::Connection> {
     dotenv().ok();
 
     let redis_url = env::var("REDIS_URL").expect("REDIS_URL must be set");
 
-    let client = redis::Client::open(redis_url)?;
+    let client = redis::Client::open(redis_url).expect("Failed to connect to Redis");
     let connection = client.get_connection().unwrap();
     Ok(connection)
 }
@@ -52,35 +48,25 @@ pub async fn get_all_images() -> Vec<Image> {
         .expect("Failed to connect to Redis");
 
     let mut images: Vec<Image> = Vec::new();
-
-    let mut iter: redis::AsyncIter<'_, String> =
-        con.scan_match("image:*").expect("Failed to scan keys");
-
-    while let Some(key) = iter.next_item().await {
-        let value: String = con.get(&key).await.expect("Failed to get value from Redis");
-        let image: Image = serde_json::from_str(&value).expect("Failed to deserialize JSON");
-        images.push(image);
-    }
-
+    // get all images
     images
 }
 
 // Post an image to DB
-pub async fn post_image(image_data: Json<Image>) -> &'static str {
+pub async fn post_image(image_data: Image) -> bool {
     let mut con = connect_to_redis()
         .await
         .expect("Failed to connect to Redis");
 
-    // Key with pub key
-    let key = format!("image:{}", image_data.poster_pubkey.clone());
-    let json_data =
-        serde_json::to_string(&image_data.into_inner()).expect("Failed to serialize data");
+    // Key with timestamp
+    let key = format!("image:{}", image_data.timestamp.clone());
+    let json_data = serde_json::to_string(&image_data).expect("Failed to serialize data");
 
     let _: () = con
         .set(key, json_data)
         .expect("Failed to set data in Redis");
 
-    "Image added successfully"
+    true
 }
 
 // Connect S3 client
@@ -91,15 +77,16 @@ async fn get_s3_client() -> Client {
 }
 
 // Upload an image to S3
-async fn upload_image(image_data: ImageRequest) -> Result<String, Box<dyn std::error::Error>> {
+pub async fn upload_image(image_data: ImageRequest) -> Result<String, Box<dyn std::error::Error>> {
     dotenv().ok();
 
     let bucket = env::var("S3_BUCKET").expect("S3_BUCKET must be set");
     let s3_client = get_s3_client().await;
 
     // Hash the contents as filename
+    let image_data_str = serde_json::to_string(&image_data).expect("Failed to serialize data");
     let mut hasher = Sha256::new();
-    hasher.update(&image_data);
+    hasher.update(image_data_str);
     let hash = hasher.finalize();
     let file_name = format!("{:x}", hash);
 
