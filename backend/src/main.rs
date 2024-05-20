@@ -1,10 +1,12 @@
-use dotenv::dotenv;
-use rocket::serde::{json::Json, Deserialize};
-use std::env;
-use tokio_postgres::{Error, NoTls};
+use db::Image;
+use rocket::serde::json::serde_json;
+use rocket::serde::{self, json::Json, Deserialize, Serialize};
+use rocket_contrib::{Value, JSON};
+use rocket_sync_db_pools::database;
 
-use crate::utils::check_and_insert_challenge;
+use crate::utils::add_challenge;
 
+pub mod db;
 pub mod utils;
 
 #[macro_use]
@@ -15,11 +17,6 @@ fn index() -> &'static str {
     "Hello, world!"
 }
 
-#[get("/challenge")]
-fn challenge() -> String {
-    return utils::generate_random_challenge();
-}
-
 #[derive(Deserialize)]
 #[serde(crate = "rocket::serde")]
 pub struct AttestationData<'r> {
@@ -28,35 +25,30 @@ pub struct AttestationData<'r> {
     challenge: &'r str, // challenge is user-supplied.
 }
 
+// Get a random challenge
+#[get("/challenge")]
+fn challenge() -> String {
+    return utils::generate_random_challenge();
+}
+
+// Appattest endpoint
 #[post("/appattest", format = "application/json", data = "<attestation_data>")]
 async fn appattest(attestation_data: Json<AttestationData<'_>>) -> () {
     const APP_ID: &str = "proof-pix";
 
-    dotenv().ok();
+    let con = utils::get_db_client().await;
 
-    // Get the database URL from the environment variable
-    let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
-
-    // Connect to the database
-    let (client, connection) = tokio_postgres::connect(&database_url, NoTls)
+    // Add challenge to used challenges
+    let added = add_challenge(&con, attestation_data.challenge)
         .await
-        .expect("connection failed");
+        .expect("Failed to add challenge");
 
-    // Spawn a new task to run the connection, so we can execute queries on the client
-    tokio::spawn(async move {
-        if let Err(e) = connection.await {
-            eprintln!("connection error: {}", e);
-        }
-    });
-
-    // Check if challenge has already been used
-    match check_and_insert_challenge(&client, attestation_data.challenge).await {
-        Ok(_) => {}
-        Err(e) => {
-            println!("Error checking and inserting challenge: {}", e);
-            return;
-        }
-    };
+    if added {
+        println!("Challenge added.");
+    } else {
+        println!("Challenge already exists.");
+        return;
+    }
 
     let verified = app_attest::validate_raw_attestation(
         attestation_data.attestation_string,
@@ -67,25 +59,59 @@ async fn appattest(attestation_data: Json<AttestationData<'_>>) -> () {
         false, // leaf_cert_only
     );
 
-    // TODO: do something with attestation data
+    // If verified
     if verified {
         println!("Verified attestation");
+        // can do something
     }
 }
 
-#[derive(Deserialize)]
+// Post request for an image
+#[derive(Deserialize, Serialize)]
 #[serde(crate = "rocket::serde")]
-struct ImageData {
-    image_data: Vec<u8>,
-    signature: Vec<u8>,
+pub struct ImageRequest {
+    timestamp: String,
+    photo_url: String,
+    photo_signature: String,
+    poster_pubkey: String,
+    poster_attest_proof: String,
+    location: String,
 }
 
-#[post("/image", format = "application/json", data = "<image_data>")]
-fn post_image(image_data: Json<ImageData>) -> () {
-    // TODO: do something with image data
+// Add an image
+#[post("/add", format = "application/json", data = "<image_data>")]
+async fn post_image(image_data: Json<ImageRequest>) -> () {
+    let con = utils::get_db_client().await;
+    db::add_image(&con, image_data).await;
+}
+
+// Get all images
+#[get("/images")]
+async fn get_all_images() -> JSON<Vec<Image>> {
+    let con = db::get_db_client().await;
+    let images = db::get_images(&con).await;
+    Json(images)
+}
+
+// Get all images from a specific user
+#[get("/images/<pub_key>")]
+async fn get_images_for_user(pub_key: String) -> JSON<Vec<Image>> {
+    let con = db::get_db_client().await;
+    let images = db::get_images_for_user(&con, user_id).await;
+    Json(images)
 }
 
 #[launch]
 fn rocket() -> _ {
-    rocket::build().mount("/", routes![index, challenge, appattest, post_image])
+    rocket::build().mount(
+        "/",
+        routes![
+            index,
+            challenge,
+            appattest,
+            post_image,
+            get_images_for_user,
+            get_all_images
+        ],
+    )
 }
