@@ -4,19 +4,38 @@ use rocket::serde::json::serde_json;
 use rocket::serde::{json::Json, Deserialize, Serialize};
 use std::env;
 
+use aws_config::meta::region::RegionProviderChain;
+use aws_sdk_s3::{types::ByteStream, Client};
+use futures::TryStreamExt;
+use rocket::data::{ByteUnit, Data};
+use rocket::http::Status;
+use rocket::response::status;
+use sha2::{Digest, Sha256};
+
+#[derive(Deserialize, Serialize, Clone)]
+#[serde(crate = "rocket::serde")]
+pub struct ImageRequest {
+    pub photo_bytes: Vec<u8>,
+    pub timestamp: String,
+    pub photo_signature: String,
+    pub poster_pubkey: String,
+    pub poster_attest_proof: String,
+    pub location: String,
+}
+
 #[derive(Deserialize, Serialize, Clone)]
 #[serde(crate = "rocket::serde")]
 pub struct Image {
-    timestamp: String,
-    photo_url: String,
-    photo_signature: String,
-    poster_pubkey: String,
-    poster_attest_proof: String,
-    location: String,
+    pub photo_url: String,
+    pub timestamp: String,
+    pub photo_signature: String,
+    pub poster_pubkey: String,
+    pub poster_attest_proof: String,
+    pub location: String,
 }
 
 // Connect to Redis
-pub(crate) async fn connect_to_redis() -> redis::RedisResult<redis::aio::Connection> {
+pub async fn connect_to_redis() -> redis::RedisResult<redis::aio::Connection> {
     dotenv().ok();
 
     let redis_url = env::var("REDIS_URL").expect("REDIS_URL must be set");
@@ -46,7 +65,7 @@ pub async fn get_all_images() -> Vec<Image> {
     images
 }
 
-// Post an image
+// Post an image to DB
 pub async fn post_image(image_data: Json<Image>) -> &'static str {
     let mut con = connect_to_redis()
         .await
@@ -62,4 +81,38 @@ pub async fn post_image(image_data: Json<Image>) -> &'static str {
         .expect("Failed to set data in Redis");
 
     "Image added successfully"
+}
+
+// Connect S3 client
+async fn get_s3_client() -> Client {
+    let region_provider = RegionProviderChain::default_provider().or_else("us-east-1");
+    let config = aws_config::from_env().region(region_provider).load().await;
+    Client::new(&config)
+}
+
+// Upload an image to S3
+async fn upload_image(image_data: ImageRequest) -> Result<String, Box<dyn std::error::Error>> {
+    dotenv().ok();
+
+    let bucket = env::var("S3_BUCKET").expect("S3_BUCKET must be set");
+    let s3_client = get_s3_client().await;
+
+    // Hash the contents as filename
+    let mut hasher = Sha256::new();
+    hasher.update(&image_data);
+    let hash = hasher.finalize();
+    let file_name = format!("{:x}", hash);
+
+    let byte_stream = ByteStream::from(image_data.photo_bytes.clone());
+
+    // Upload the image to S3
+    s3_client
+        .put_object()
+        .bucket(bucket)
+        .key(&file_name)
+        .body(byte_stream)
+        .send()
+        .await?;
+
+    Ok(file_name)
 }

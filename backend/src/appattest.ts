@@ -1,3 +1,12 @@
+
+// #[derive(Deserialize)]
+// #[serde(crate = "rocket::serde")]
+// pub struct AttestationData<'r> {
+//     attestation_string: &'r str,
+//     raw_key_id: &'r str,
+//     challenge: &'r str, // challenge is user-supplied.
+// }
+
 // Appattest endpoint
 // #[post("/appattest", format = "application/json", data = "<attestation_data>")]
 // async fn appattest(attestation_data: Json<AttestationData<'_>>) -> () {

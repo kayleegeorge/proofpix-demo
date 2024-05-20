@@ -13,34 +13,37 @@ fn index() -> &'static str {
     "Hello, world!"
 }
 
-#[derive(Deserialize)]
-#[serde(crate = "rocket::serde")]
-pub struct AttestationData<'r> {
-    attestation_string: &'r str,
-    raw_key_id: &'r str,
-    challenge: &'r str, // challenge is user-supplied.
-}
-
 // Get a random challenge
 #[get("/challenge")]
 fn challenge() -> String {
     return utils::generate_random_challenge();
 }
 
-// Add an image
+// Post an images
 #[post("/add", format = "application/json", data = "<image_data>")]
-async fn post_image(image_data: Json<Image>) -> () {
+async fn post_image(image_data: Json<ImageRequest>) -> () {
+    let file_name = db::upload_image(image_data).await;
+
+    // Image to add to Redis
+    let image = Image {
+        photo_url: file_name,
+        timestamp: image_data.timestamp,
+        photo_signature: image_data.photo_signature,
+        poster_pubkey: image_data.poster_pubkey,
+        poster_attest_proof: image_data.poster_attest_proof,
+        location: image_data.location,
+    };
     db::post_image(image_data).await;
 }
 
-// Get all images.
+// Get all images
 #[get("/images")]
-async fn get_all_images() -> Json<Vec<Image>> {
+async fn fetch_all_images() -> Json<Vec<Image>> {
     let images = db::get_all_images().await;
     Json(images)
 }
 
 #[launch]
 fn rocket() -> _ {
-    rocket::build().mount("/", routes![index, challenge, post_image, get_all_images])
+    rocket::build().mount("/", routes![index, challenge, post_image, fetch_all_images])
 }
