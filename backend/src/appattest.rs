@@ -1,40 +1,48 @@
-// #[derive(Deserialize)]
-// #[serde(crate = "rocket::serde")]
-// pub struct AttestationData<'r> {
-//     attestation_string: &'r str,
-//     raw_key_id: &'r str,
-//     challenge: &'r str, // challenge is user-supplied.
-// }
+use dotenv::dotenv;
+use rocket::serde::{json::Json, Deserialize, Serialize};
+use std::env;
 
-// Appattest endpoint
-// #[post("/appattest", format = "application/json", data = "<attestation_data>")]
-// async fn appattest(attestation_data: Json<AttestationData<'_>>) -> () {
-//     const APP_ID: &str = "proof-pix";
+use crate::db::add_challenge;
 
-//     // Add challenge to used challenges
-//     let added = add_challenge(&con, attestation_data.challenge)
-//         .await
-//         .expect("Failed to add challenge");
+#[derive(Deserialize)]
+#[serde(crate = "rocket::serde")]
+pub struct AttestationData {
+    attestation_string: String,
+    raw_key_id: String,
+    challenge: String, // challenge is user-supplied.
+}
 
-//     if added {
-//         println!("Challenge added.");
-//     } else {
-//         println!("Challenge already exists.");
-//         return;
-//     }
+// validate_attestation
+pub async fn validate_attestation(attestation_data: AttestationData) -> () {
+    dotenv().ok();
+    let app_id = env::var("APP_ID").expect("APP_ID must be set");
 
-//     let verified = app_attest::validate_raw_attestation(
-//         attestation_data.attestation_string,
-//         attestation_data.challenge,
-//         attestation_data.raw_key_id,
-//         APP_ID,
-//         false, // production
-//         false, // leaf_cert_only
-//     );
+    // Add challenge to used challenges
+    let added = add_challenge(
+        attestation_data.challenge.clone(),
+        attestation_data.attestation_string.clone(),
+    )
+    .await;
 
-//     // If verified
-//     if verified {
-//         println!("Verified attestation");
-//         // can do something
-//     }
-// }
+    if added {
+        println!("Challenge added.");
+    } else {
+        println!("Challenge already exists. Invalid attestation.");
+        return;
+    }
+
+    let verified = app_attest::validate_raw_attestation(
+        &attestation_data.attestation_string,
+        &attestation_data.challenge,
+        &attestation_data.raw_key_id,
+        &app_id,
+        false, // production
+        false, // leaf_cert_only
+    );
+
+    // If verified
+    if verified {
+        println!("Verified attestation");
+        // can do something
+    }
+}

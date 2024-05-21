@@ -15,17 +15,3 @@ pub fn generate_random_challenge() -> String {
 
     output
 }
-
-// // Function to add a challenge string to the set
-// pub async fn add_challenge(
-//     client: &tokio_postgres::Client,
-//     challenge: &str,
-// ) -> Result<bool, Error> {
-//     let rows_affected = client
-//         .execute(
-//             "INSERT INTO challenges (challenge_string) VALUES ($1) ON CONFLICT DO NOTHING",
-//             &[&challenge],
-//         )
-//         .await?;
-//     Ok(rows_affected > 0)
-// }

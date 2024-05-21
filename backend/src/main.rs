@@ -1,8 +1,9 @@
 use db::{Image, ImageMetadata};
 use rocket::serde::json::Json;
 
-use crate::db::ImageRequest;
+use crate::{appattest::AttestationData, db::ImageRequest};
 
+pub mod appattest;
 pub mod db;
 pub mod utils;
 
@@ -52,6 +53,13 @@ async fn get_image(file_name: String) -> Json<Option<ImageMetadata>> {
     }
 }
 
+// Appattest endpoint
+#[post("/appattest", format = "application/json", data = "<attestation_data>")]
+async fn app_attest(attestation_data: Json<AttestationData>) -> () {
+    let attestation_data = attestation_data.into_inner();
+    appattest::validate_attestation(attestation_data).await;
+}
+
 #[launch]
 fn rocket() -> _ {
     rocket::build().mount(
@@ -62,7 +70,8 @@ fn rocket() -> _ {
             post_image,
             fetch_all_images,
             get_image,
-            fetch_all_urls
+            fetch_all_urls,
+            app_attest
         ],
     )
 }

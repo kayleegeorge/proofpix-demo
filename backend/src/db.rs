@@ -121,8 +121,8 @@ pub async fn upload_image(image_data: ImageRequest) -> Result<String, Box<dyn st
 
     let byte_stream = ByteStream::from(image_data.photo_bytes.clone());
 
-    println!("Uploading image to S3");
     // Upload the image to S3
+    println!("Uploading image to S3");
     s3_client
         .put_object()
         .bucket(bucket)
@@ -183,4 +183,26 @@ pub async fn get_all_images() -> Vec<Image> {
     }
 
     images
+}
+
+// Check if challenge / attestation exists. If not, add to the cache
+// TODO: change to proof instead of attestation_string
+pub async fn add_challenge(challenge: String, attestation_string: String) -> bool {
+    let mut con = connect_to_redis()
+        .await
+        .expect("Failed to connect to Redis");
+
+    // Check if challenge exists
+    let challenge_proof: bool = con
+        .exists(challenge.clone())
+        .expect("Failed to check if challenge exists");
+
+    if challenge_proof {
+        return false;
+    } else {
+        let _: () = con
+            .set(challenge, attestation_string)
+            .expect("Failed to set data in Redis");
+        return true;
+    }
 }
