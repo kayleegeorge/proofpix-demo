@@ -1,21 +1,27 @@
+use aws_config::meta::region::RegionProviderChain;
+use aws_sdk_s3::{ByteStream, Client};
 use dotenv::dotenv;
 use redis::Commands;
 use rocket::serde::json::serde_json;
 use rocket::serde::{Deserialize, Serialize};
-use std::env;
-
-use aws_config::meta::region::RegionProviderChain;
-use aws_sdk_s3::{ByteStream, Client};
 use sha2::{Digest, Sha256};
+use std::env;
 
 // Connect to Redis
 pub async fn connect_to_redis() -> redis::RedisResult<redis::Connection> {
     dotenv().ok();
+    let dev = env::var("DEV").expect("DEV must be set");
+    let mut redis_url = env::var("REDIS_URL").expect("REDIS_URL must be set");
 
-    let redis_url = env::var("REDIS_URL").expect("REDIS_URL must be set");
+    if dev == "true" {
+        redis_url = env::var("DEV_REDIS_URL").expect("DEV_REDIS_URL must be set");
+    }
 
     let client = redis::Client::open(redis_url).expect("Failed to connect to Redis");
-    let connection = client.get_connection().unwrap();
+    let connection = client
+        .get_connection()
+        .expect("Failed to get Redis connection");
+
     Ok(connection)
 }
 
@@ -30,10 +36,16 @@ pub struct ImageMetadata {
 }
 
 // Get image data for one image given a url
-pub async fn get_image_metadata(image_url: String) -> Option<ImageMetadata> {
+pub async fn get_image_metadata(file_name: String) -> Option<ImageMetadata> {
     let mut con = connect_to_redis()
         .await
         .expect("Failed to connect to Redis");
+
+    dotenv().ok();
+    let bucket = env::var("S3_BUCKET").expect("S3_BUCKET must be set");
+
+    // image url formatted as "s3://bucket/file_name"
+    let image_url = format!("s3://{}/{}", bucket, file_name);
 
     let data_string: String = match con.get(image_url) {
         Ok(json) => json,
@@ -91,7 +103,6 @@ async fn get_s3_client() -> Client {
 // Upload an image to S3
 pub async fn upload_image(image_data: ImageRequest) -> Result<String, Box<dyn std::error::Error>> {
     dotenv().ok();
-
     let bucket = env::var("S3_BUCKET").expect("S3_BUCKET must be set");
     let s3_client = get_s3_client().await;
 

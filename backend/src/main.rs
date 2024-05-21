@@ -43,9 +43,9 @@ async fn fetch_all_urls() -> Json<Vec<String>> {
 }
 
 // Get an image metadata via its URL
-#[get("/image/<image_url>")]
-async fn get_image(image_url: String) -> Json<Option<ImageMetadata>> {
-    let image = db::get_image_metadata(image_url).await;
+#[get("/image/<file_name>")]
+async fn get_image(file_name: String) -> Json<Option<ImageMetadata>> {
+    let image = db::get_image_metadata(file_name).await;
     match image {
         Some(image) => Json(Some(image)),
         None => Json(None),

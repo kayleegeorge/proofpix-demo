@@ -1,4 +1,3 @@
-
 // #[derive(Deserialize)]
 // #[serde(crate = "rocket::serde")]
 // pub struct AttestationData<'r> {
