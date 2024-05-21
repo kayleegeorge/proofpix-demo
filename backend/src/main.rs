@@ -1,3 +1,5 @@
+use std::borrow::Borrow;
+
 use db::{Image, ImageMetadata};
 use rocket::Data;
 
@@ -24,11 +26,23 @@ fn challenge() -> String {
 }
 
 // Upload an image to S3 and add its metadata to cache
-#[post("/add", format = "application/json", data = "<image_data_json>")]
-async fn post_image(image_data_json: Json<ImageRequest>) -> () {
-    let image_data = image_data_json.into_inner();
-    let file_name = db::upload_image(image_data.clone()).await.unwrap();
-    db::add_image(file_name, image_data).await;
+#[post("/add", data = "<image_data_form>")]
+async fn post_image(image_data_form: Form<ImageRequest<'_>>) -> Json<String> {
+    println!("Received image form: {:?}", image_data_form);
+    let image_data = image_data_form.into_inner();
+    let file_name = db::upload_image(image_data.photo_file).await.unwrap();
+
+    // Add the image to the cache
+    let image_metadata = ImageMetadata {
+        timestamp: image_data.timestamp,
+        photo_signature: image_data.photo_signature,
+        poster_pubkey: image_data.poster_pubkey,
+        poster_attest_proof: image_data.poster_attest_proof,
+        location: image_data.location,
+    };
+
+    db::add_image(file_name.clone(), image_metadata).await;
+    Json(file_name)
 }
 
 // Get all images
@@ -58,7 +72,7 @@ async fn get_image(file_name: String) -> Json<Option<ImageMetadata>> {
 // Appattest endpoint
 #[post("/appattest", data = "<data>")]
 async fn app_attest(data: Form<AttestationData>) -> String {
-    println!("form: {:?}", data);
+    println!("Received ttestation form: {:?}", data);
     let attestation_data = data.into_inner();
     return appattest::validate_attestation(attestation_data)
         .await

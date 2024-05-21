@@ -2,8 +2,10 @@ use aws_config::meta::region::RegionProviderChain;
 use aws_sdk_s3::{ByteStream, Client};
 use dotenv::dotenv;
 use redis::Commands;
+use rocket::fs::TempFile;
 use rocket::serde::json::serde_json;
 use rocket::serde::{Deserialize, Serialize};
+use rocket::tokio::io;
 use sha2::{Digest, Sha256};
 use std::env;
 
@@ -59,10 +61,9 @@ pub async fn get_image_metadata(file_name: String) -> Option<ImageMetadata> {
     }
 }
 
-#[derive(Deserialize, Serialize, Clone)]
-#[serde(crate = "rocket::serde")]
-pub struct ImageRequest {
-    pub photo_bytes: Vec<u8>,
+#[derive(FromForm, Debug)]
+pub struct ImageRequest<'r> {
+    pub photo_file: TempFile<'r>,
     pub timestamp: String,
     pub photo_signature: String,
     pub poster_pubkey: String,
@@ -71,23 +72,15 @@ pub struct ImageRequest {
 }
 
 // Add an image's metadata to cache
-pub async fn add_image(image_url: String, image_data: ImageRequest) -> bool {
+pub async fn add_image(file_name: String, image_metadata: ImageMetadata) -> bool {
     let mut con = connect_to_redis()
         .await
         .expect("Failed to connect to Redis");
 
-    // Convert the image data to string
-    let image_data_json = ImageMetadata {
-        timestamp: image_data.timestamp,
-        photo_signature: image_data.photo_signature,
-        poster_pubkey: image_data.poster_pubkey,
-        poster_attest_proof: image_data.poster_attest_proof,
-        location: image_data.location,
-    };
-    let data_string = serde_json::to_string(&image_data_json).expect("Failed to serialize data");
+    let data_string = serde_json::to_string(&image_metadata).expect("Failed to serialize data");
 
     let _: () = con
-        .set(image_url, data_string)
+        .set(file_name, data_string)
         .expect("Failed to set data in Redis");
 
     true
@@ -105,21 +98,28 @@ async fn get_s3_client() -> Client {
 }
 
 // Upload an image to S3
-pub async fn upload_image(image_data: ImageRequest) -> Result<String, Box<dyn std::error::Error>> {
+pub async fn upload_image(photo_file: TempFile<'_>) -> Result<String, Box<dyn std::error::Error>> {
     println!("Connecting to S3");
     dotenv().ok();
     let bucket = env::var("S3_BUCKET").expect("S3_BUCKET must be set");
     let s3_client = get_s3_client().await;
 
     println!("Serializing image data");
-    // Hash the contents as filename
-    let image_data_str = serde_json::to_string(&image_data).expect("Failed to serialize data");
+
+    // Read photo bytes
+    let file = photo_file;
+    let mut buffer = Vec::new();
+    let mut stream = file.open().await?;
+    io::copy(&mut stream, &mut buffer).await?;
+
+    let byte_stream = ByteStream::from(buffer.clone());
+    println!("Byte stream from image: {:?}", byte_stream);
+
+    // photo name is hash of the photo signature for now
     let mut hasher = Sha256::new();
-    hasher.update(image_data_str);
+    hasher.update(buffer.clone());
     let hash = hasher.finalize();
     let file_name = format!("{:x}", hash);
-
-    let byte_stream = ByteStream::from(image_data.photo_bytes.clone());
 
     // Upload the image to S3
     println!("Uploading image to S3");
