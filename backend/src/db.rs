@@ -34,7 +34,8 @@ pub struct ImageMetadata {
     pub photo_signature: String,
     pub poster_pubkey: String,
     pub poster_attest_proof: String,
-    pub location: String,
+    pub location_lat: String,
+    pub location_long: String,
 }
 
 // Get image data for one image given a url
@@ -68,7 +69,8 @@ pub struct ImageRequest<'r> {
     pub photo_signature: String,
     pub poster_pubkey: String,
     pub poster_attest_proof: String,
-    pub location: String,
+    pub location_lat: String,
+    pub location_long: String,
 }
 
 // Add an image's metadata to cache
@@ -154,7 +156,8 @@ pub struct Image {
     pub photo_signature: String,
     pub poster_pubkey: String,
     pub poster_attest_proof: String,
-    pub location: String,
+    pub location_lat: String,
+    pub location_long: String,
 }
 
 // Get all data from cache
@@ -177,7 +180,8 @@ pub async fn get_all_images() -> Vec<Image> {
             photo_signature: metadata.photo_signature,
             poster_pubkey: metadata.poster_pubkey,
             poster_attest_proof: metadata.poster_attest_proof,
-            location: metadata.location,
+            location_lat: metadata.location_lat,
+            location_long: metadata.location_long,
         };
         images.push(image);
     }

@@ -38,7 +38,8 @@ async fn post_image(image_data_form: Form<ImageRequest<'_>>) -> Json<String> {
         photo_signature: image_data.photo_signature,
         poster_pubkey: image_data.poster_pubkey,
         poster_attest_proof: image_data.poster_attest_proof,
-        location: image_data.location,
+        location_lat: image_data.location_lat,
+        location_long: image_data.location_long,
     };
 
     db::add_image(file_name.clone(), image_metadata).await;
