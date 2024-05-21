@@ -1,5 +1,7 @@
 use db::{Image, ImageMetadata};
-use rocket::serde::json::Json;
+use rocket::Data;
+
+use rocket::{form::Form, http::ContentType, serde::json::Json};
 
 use crate::{appattest::AttestationData, db::ImageRequest};
 
@@ -54,10 +56,13 @@ async fn get_image(file_name: String) -> Json<Option<ImageMetadata>> {
 }
 
 // Appattest endpoint
-#[post("/appattest", format = "application/json", data = "<attestation_data>")]
-async fn app_attest(attestation_data: Json<AttestationData>) -> () {
-    let attestation_data = attestation_data.into_inner();
-    appattest::validate_attestation(attestation_data).await;
+#[post("/appattest", data = "<data>")]
+async fn app_attest(data: Form<AttestationData>) -> String {
+    println!("form: {:?}", data);
+    let attestation_data = data.into_inner();
+    return appattest::validate_attestation(attestation_data)
+        .await
+        .to_string();
 }
 
 #[launch]
