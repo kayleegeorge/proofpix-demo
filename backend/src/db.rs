@@ -96,16 +96,22 @@ pub async fn add_image(image_url: String, image_data: ImageRequest) -> bool {
 // Connect S3 client
 async fn get_s3_client() -> Client {
     let region_provider = RegionProviderChain::default_provider().or_else("us-west-2");
+    let aws_access_key_id = env::var("AWS_ACCESS_KEY_ID").expect("AWS_ACCESS_KEY_ID not set");
+    let aws_secret_access_key =
+        env::var("AWS_SECRET_ACCESS_KEY").expect("AWS_SECRET_ACCESS_KEY not set");
+
     let config = aws_config::from_env().region(region_provider).load().await;
     Client::new(&config)
 }
 
 // Upload an image to S3
 pub async fn upload_image(image_data: ImageRequest) -> Result<String, Box<dyn std::error::Error>> {
+    println!("Connecting to S3");
     dotenv().ok();
     let bucket = env::var("S3_BUCKET").expect("S3_BUCKET must be set");
     let s3_client = get_s3_client().await;
 
+    println!("Serializing image data");
     // Hash the contents as filename
     let image_data_str = serde_json::to_string(&image_data).expect("Failed to serialize data");
     let mut hasher = Sha256::new();
@@ -115,6 +121,7 @@ pub async fn upload_image(image_data: ImageRequest) -> Result<String, Box<dyn st
 
     let byte_stream = ByteStream::from(image_data.photo_bytes.clone());
 
+    println!("Uploading image to S3");
     // Upload the image to S3
     s3_client
         .put_object()
@@ -124,6 +131,7 @@ pub async fn upload_image(image_data: ImageRequest) -> Result<String, Box<dyn st
         .send()
         .await?;
 
+    println!("Done: Image uploaded to S3!");
     Ok(file_name)
 }
 
