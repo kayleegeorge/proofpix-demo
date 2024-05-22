@@ -22,18 +22,18 @@ pub async fn validate_attestation(attestation_data: AttestationData) -> &'static
     dotenv().ok();
     let app_id = env::var("APP_ID").expect("APP_ID must be set");
 
-    let added = add_challenge(
-        attestation_data.challenge.clone(),
-        attestation_data.attestation_string.clone(),
-    )
-    .await;
+    // let added = add_challenge(
+    //     attestation_data.challenge.clone(),
+    //     attestation_data.attestation_string.clone(),
+    // )
+    // .await;
 
-    if added {
-        println!("Challenge added.");
-    } else {
-        println!("Challenge already exists. Invalid attestation.");
-        return "challenge already exists";
-    }
+    // if added {
+    //     println!("Challenge added.");
+    // } else {
+    //     println!("Challenge already exists. Invalid attestation.");
+    //     return "challenge already exists";
+    // }
 
     // Verify the attestation
     println!("Verifying attestation... {:?}", attestation_data);
