@@ -81,6 +81,15 @@ pub async fn add_image(file_name: String, image_metadata: ImageMetadata) -> bool
 
     let data_string = serde_json::to_string(&image_metadata).expect("Failed to serialize data");
 
+    // Check if image already exists
+    if con
+        .exists(file_name.clone())
+        .expect("Failed to check if image exists")
+    {
+        println!("Image already exists");
+        return false;
+    }
+
     let _: () = con
         .set(file_name, data_string)
         .expect("Failed to set data in Redis");
@@ -122,6 +131,18 @@ pub async fn upload_image(photo_file: TempFile<'_>) -> Result<String, Box<dyn st
     hasher.update(buffer.clone());
     let hash = hasher.finalize();
     let file_name = format!("{:x}.jpeg", hash);
+
+    // Check if image already exists
+    let mut redis_client = connect_to_redis()
+        .await
+        .expect("Failed to connect to Redis");
+    if redis_client
+        .exists(file_name.clone())
+        .expect("Failed to check if image exists")
+    {
+        println!("Image already exists");
+        return Ok(file_name);
+    }
 
     // Upload the image to S3
     println!("Uploading image to S3");
