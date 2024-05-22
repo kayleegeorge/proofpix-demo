@@ -1,2 +1,2 @@
 [global.limits]
-form = 500KiB
+form = 2MiB
