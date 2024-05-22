@@ -19,14 +19,13 @@ fn index() -> &'static str {
 
 // Get a random challenge
 #[get("/challenge")]
-fn challenge() -> String {
-    return utils::generate_random_challenge();
+fn challenge() -> Json<String> {
+    return Json(utils::generate_random_challenge());
 }
 
 // Upload an image to S3 and add its metadata to cache
 #[post("/add", data = "<image_data_form>")]
 async fn post_image(image_data_form: Form<ImageRequest<'_>>) -> Json<String> {
-    println!("Received image form: {:?}", image_data_form);
     let image_data = image_data_form.into_inner();
     let file_name = db::upload_image(image_data.photo_file).await.unwrap();
 
