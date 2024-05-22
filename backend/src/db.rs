@@ -121,7 +121,7 @@ pub async fn upload_image(photo_file: TempFile<'_>) -> Result<String, Box<dyn st
     let mut hasher = Sha256::new();
     hasher.update(buffer.clone());
     let hash = hasher.finalize();
-    let file_name = format!("{:x}", hash);
+    let file_name = format!("{:x}.jpeg", hash);
 
     // Upload the image to S3
     println!("Uploading image to S3");
