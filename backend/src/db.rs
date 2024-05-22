@@ -189,7 +189,7 @@ pub async fn get_all_images() -> Vec<Image> {
         .await
         .expect("Failed to connect to Redis");
 
-    let keys: Vec<String> = con.keys("*").expect("Failed to get keys from Redis");
+    let keys: Vec<String> = con.keys("*.jpeg").expect("Failed to get keys from Redis");
 
     // Fetch the image metadata for each image
     let mut images: Vec<Image> = Vec::new();
