@@ -1,9 +1,6 @@
-use std::borrow::Borrow;
-
 use db::{Image, ImageMetadata};
-use rocket::Data;
 
-use rocket::{form::Form, http::ContentType, serde::json::Json};
+use rocket::{form::Form, serde::json::Json};
 
 use crate::{appattest::AttestationData, db::ImageRequest};
 
