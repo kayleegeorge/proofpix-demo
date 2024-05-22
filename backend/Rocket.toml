@@ -1,2 +1,4 @@
 [global.limits]
-form = 2MiB
+form = "2 MiB"
+"file/jpg" = "2 MiB"
+"file/png" = "2 MiB"
