@@ -80,7 +80,7 @@ async fn get_image(file_name: String) -> Json<Option<ImageMetadata>> {
 // Appattest endpoint
 #[post("/appattest", data = "<data>")]
 async fn app_attest(data: Form<AttestationData>) -> String {
-    println!("Received ttestation form: {:?}", data);
+    println!("Received attestation form: {:?}", data);
     let attestation_data = data.into_inner();
     return appattest::validate_attestation(attestation_data)
         .await

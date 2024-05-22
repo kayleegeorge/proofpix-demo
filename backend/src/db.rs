@@ -1,4 +1,3 @@
-use aws_config::meta;
 use aws_config::meta::region::RegionProviderChain;
 use aws_sdk_s3::{ByteStream, Client};
 use dotenv::dotenv;
