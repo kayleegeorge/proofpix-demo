@@ -22,13 +22,8 @@ pub async fn validate_attestation(attestation_data: AttestationData) -> &'static
     dotenv().ok();
     let app_id = env::var("APP_ID").expect("APP_ID must be set");
 
-    // Add challenge to used challenges
-    let challenge = String::from_utf8(app_attest::utils::decode_base64_to_bytes(
-        &attestation_data.challenge.to_string(),
-    ))
-    .unwrap();
     let added = add_challenge(
-        challenge.clone(),
+        attestation_data.challenge.clone(),
         attestation_data.attestation_string.clone(),
     )
     .await;
@@ -45,7 +40,7 @@ pub async fn validate_attestation(attestation_data: AttestationData) -> &'static
     let verified = app_attest::validate_raw_attestation(
         &attestation_data.attestation_string,
         &attestation_data.raw_key_id,
-        &challenge,
+        &attestation_data.challenge,
         &app_id,
         false, // production
         false, // leaf_cert_only
