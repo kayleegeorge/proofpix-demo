@@ -1,6 +1,7 @@
 use db::{Image, ImageMetadata};
-
+use dotenv::dotenv;
 use rocket::{form::Form, serde::json::Json};
+use std::env;
 
 use crate::{appattest::AttestationData, db::ImageRequest};
 
@@ -29,8 +30,14 @@ async fn post_image(image_data_form: Form<ImageRequest<'_>>) -> Json<String> {
     let image_data = image_data_form.into_inner();
     let file_name = db::upload_image(image_data.photo_file).await.unwrap();
 
+    dotenv().ok();
+    let bucket = env::var("S3_BUCKET").expect("S3_BUCKET must be set");
+
+    let photo_url = format!("https://{bucket}.s3.us-west-2.amazonaws.com/{file_name}");
+
     // Add the image to the cache
     let image_metadata = ImageMetadata {
+        photo_url: photo_url,
         timestamp: image_data.timestamp,
         photo_signature: image_data.photo_signature,
         poster_pubkey: image_data.poster_pubkey,
@@ -51,9 +58,9 @@ async fn fetch_all_images() -> Json<Vec<Image>> {
 }
 
 // Get all image URLs
-#[get("/urls")]
-async fn fetch_all_urls() -> Json<Vec<String>> {
-    let urls = db::get_all_urls().await;
+#[get("/filenames")]
+async fn fetch_all_filenames() -> Json<Vec<String>> {
+    let urls = db::get_all_filenames().await;
     Json(urls)
 }
 
@@ -87,7 +94,7 @@ fn rocket() -> _ {
             post_image,
             fetch_all_images,
             get_image,
-            fetch_all_urls,
+            fetch_all_filenames,
             app_attest
         ],
     )

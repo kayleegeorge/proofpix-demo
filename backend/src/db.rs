@@ -1,3 +1,4 @@
+use aws_config::meta;
 use aws_config::meta::region::RegionProviderChain;
 use aws_sdk_s3::{ByteStream, Client};
 use dotenv::dotenv;
@@ -30,6 +31,7 @@ pub async fn connect_to_redis() -> redis::RedisResult<redis::Connection> {
 #[derive(Deserialize, Serialize, Clone)]
 #[serde(crate = "rocket::serde")]
 pub struct ImageMetadata {
+    pub photo_url: String,
     pub timestamp: String,
     pub photo_signature: String,
     pub poster_pubkey: String,
@@ -44,13 +46,7 @@ pub async fn get_image_metadata(file_name: String) -> Option<ImageMetadata> {
         .await
         .expect("Failed to connect to Redis");
 
-    dotenv().ok();
-    let bucket = env::var("S3_BUCKET").expect("S3_BUCKET must be set");
-
-    // image url formatted as "s3://bucket/file_name"
-    let image_s3 = format!("s3://{}/{}", bucket, file_name);
-
-    let data_string: String = match con.get(image_s3) {
+    let data_string: String = match con.get(file_name) {
         Ok(json) => json,
         Err(_) => return None,
     };
@@ -160,14 +156,14 @@ pub async fn upload_image(photo_file: TempFile<'_>) -> Result<String, Box<dyn st
 }
 
 // Return all image URLs in the cache
-pub async fn get_all_urls() -> Vec<String> {
+pub async fn get_all_filenames() -> Vec<String> {
     let mut con = connect_to_redis()
         .await
         .expect("Failed to connect to Redis");
 
-    let urls: Vec<String> = con.keys("*").expect("Failed to get keys from Redis");
+    let filenames: Vec<String> = con.keys("*").expect("Failed to get keys from Redis");
 
-    urls
+    filenames
 }
 
 #[derive(Deserialize, Serialize, Clone)]
@@ -197,7 +193,7 @@ pub async fn get_all_images() -> Vec<Image> {
         let metadata: ImageMetadata =
             serde_json::from_str(&value).expect("Failed to deserialize JSON");
         let image = Image {
-            photo_url: key,
+            photo_url: metadata.photo_url,
             timestamp: metadata.timestamp,
             photo_signature: metadata.photo_signature,
             poster_pubkey: metadata.poster_pubkey,
