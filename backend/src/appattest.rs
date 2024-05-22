@@ -36,6 +36,8 @@ pub async fn validate_attestation(attestation_data: AttestationData) -> &'static
         return "challenge already exists";
     }
 
+    // Verify the attestation
+    println!("Verifying attestation... {:?}", attestation_data);
     let verified = app_attest::validate_raw_attestation(
         &attestation_data.attestation_string,
         &attestation_data.challenge,
