@@ -48,9 +48,9 @@ pub async fn get_image_metadata(file_name: String) -> Option<ImageMetadata> {
     let bucket = env::var("S3_BUCKET").expect("S3_BUCKET must be set");
 
     // image url formatted as "s3://bucket/file_name"
-    let image_url = format!("s3://{}/{}", bucket, file_name);
+    let image_s3 = format!("s3://{}/{}", bucket, file_name);
 
-    let data_string: String = match con.get(image_url) {
+    let data_string: String = match con.get(image_s3) {
         Ok(json) => json,
         Err(_) => return None,
     };
@@ -130,6 +130,7 @@ pub async fn upload_image(photo_file: TempFile<'_>) -> Result<String, Box<dyn st
         .bucket(bucket)
         .key(&file_name)
         .body(byte_stream)
+        .content_type("image/jpeg")
         .send()
         .await?;
 
