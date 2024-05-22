@@ -12,28 +12,26 @@ use crate::db::add_challenge;
 pub struct AttestationData {
     pub attestation_string: String,
     pub raw_key_id: String,
-    pub challenge: String, // challenge is user-supplied.
+    pub challenge: String,
 }
 
 // validate_attestation
 pub async fn validate_attestation(attestation_data: AttestationData) -> &'static str {
-    println!("attempting to validate attestation: {:?}", attestation_data);
-
     dotenv().ok();
     let app_id = env::var("APP_ID").expect("APP_ID must be set");
 
-    // let added = add_challenge(
-    //     attestation_data.challenge.clone(),
-    //     attestation_data.attestation_string.clone(),
-    // )
-    // .await;
+    let added = add_challenge(
+        attestation_data.challenge.clone(),
+        attestation_data.attestation_string.clone(),
+    )
+    .await;
 
-    // if added {
-    //     println!("Challenge added.");
-    // } else {
-    //     println!("Challenge already exists. Invalid attestation.");
-    //     return "challenge already exists";
-    // }
+    if added {
+        println!("Challenge added.");
+    } else {
+        println!("Challenge already exists. Invalid attestation.");
+        return "challenge already exists";
+    }
 
     // Verify the attestation
     println!("Verifying attestation... {:?}", attestation_data);
@@ -49,7 +47,7 @@ pub async fn validate_attestation(attestation_data: AttestationData) -> &'static
     // If verified
     if verified {
         return "Verified attestation";
+    } else {
+        return "Invalid attestation";
     }
-
-    return "";
 }
