@@ -178,6 +178,12 @@ pub struct Image {
     pub location_long: String,
 }
 
+#[derive(Deserialize, Serialize, Clone)]
+#[serde(crate = "rocket::serde")]
+pub struct ImagesResponse {
+    pub post_data_objects: Vec<Image>,
+}
+
 // Get all data from cache
 pub async fn get_all_images() -> Vec<Image> {
     let mut con = connect_to_redis()
@@ -192,6 +198,7 @@ pub async fn get_all_images() -> Vec<Image> {
         let value: String = con.get(&key).expect("Failed to get value from Redis");
         let metadata: ImageMetadata =
             serde_json::from_str(&value).expect("Failed to deserialize JSON");
+
         let image = Image {
             photo_url: metadata.photo_url,
             timestamp: metadata.timestamp,

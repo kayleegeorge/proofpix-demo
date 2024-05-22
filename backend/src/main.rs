@@ -1,4 +1,4 @@
-use db::{Image, ImageMetadata};
+use db::{Image, ImageMetadata, ImagesResponse};
 use dotenv::dotenv;
 use rocket::{form::Form, serde::json::Json};
 use std::env;
@@ -52,9 +52,12 @@ async fn post_image(image_data_form: Form<ImageRequest<'_>>) -> Json<String> {
 
 // Get all images
 #[get("/images")]
-async fn fetch_all_images() -> Json<Vec<Image>> {
+async fn fetch_all_images() -> Json<ImagesResponse> {
     let images = db::get_all_images().await;
-    Json(images)
+    let post_data_objects: ImagesResponse = ImagesResponse {
+        post_data_objects: images,
+    };
+    Json(post_data_objects)
 }
 
 // Get all image URLs
