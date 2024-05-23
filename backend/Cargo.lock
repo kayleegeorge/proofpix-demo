@@ -29,7 +29,7 @@ dependencies = [
 [[package]]
 name = "app-attest"
 version = "0.1.0"
-source = "git+https://github.com/kayleegeorge/app-attest#0f314485f19f45bc213ef9522b1a31079043a3da"
+source = "git+https://github.com/kayleegeorge/app-attest#f02a9f45b9aac77789960602922b41d3c661f7dd"
 dependencies = [
  "base64ct",
  "bcder",
