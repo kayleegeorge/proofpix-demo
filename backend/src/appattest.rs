@@ -19,25 +19,23 @@ pub struct AttestationData {
 pub async fn validate_attestation(attestation_data: AttestationData) -> &'static str {
     dotenv().ok();
     let app_id = env::var("APP_ID").expect("APP_ID must be set");
-    // let prod_mode: String = env::var("PROD_MODE").expect("PROD_MODE must be set");
-    // let prod = if prod_mode == "true" { true } else { false };
+    let dev: String = env::var("DEV").expect("DEV must be set");
+    let prod = if dev == "true" { false } else { true };
 
-    // let added = add_challenge(
-    //     attestation_data.challenge.clone(),
-    //     attestation_data.attestation_string.clone(),
-    // )
-    // .await;
+    let added = add_challenge(
+        attestation_data.challenge.clone(),
+        attestation_data.attestation_string.clone(),
+    )
+    .await;
 
-    // if added {
-    //     println!("Challenge added.");
-    // } else {
-    //     println!("Challenge already exists. Invalid attestation.");
-    //     return "challenge already exists";
-    // }
+    if added {
+        println!("Challenge added.");
+    } else {
+        println!("Challenge already exists. Invalid attestation.");
+        return "challenge already exists";
+    }
 
     // Verify the attestation
-    let prod = true;
-    println!("PROD: {:?}", prod);
     println!("Verifying attestation... {:?}", attestation_data);
     let verified = app_attest::validate_raw_attestation(
         &attestation_data.attestation_string,
