@@ -19,6 +19,8 @@ pub struct AttestationData {
 pub async fn validate_attestation(attestation_data: AttestationData) -> &'static str {
     dotenv().ok();
     let app_id = env::var("APP_ID").expect("APP_ID must be set");
+    let prod_mode: String = env::var("PROD_MODE").expect("PROD_MODE must be set");
+    let prod = if prod_mode == "true" { true } else { false };
 
     let added = add_challenge(
         attestation_data.challenge.clone(),
@@ -40,7 +42,7 @@ pub async fn validate_attestation(attestation_data: AttestationData) -> &'static
         &attestation_data.raw_key_id,
         &attestation_data.challenge,
         &app_id,
-        false, // production
+        prod,  // production
         false, // leaf_cert_only
     );
 

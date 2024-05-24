@@ -1,5 +1,7 @@
 {
     "rust-analyzer.linkedProjects": [
         "/Users/kayleegeorge/code/appattest-server/backend/Cargo.toml",
-      ]
+      ],
+      "rust-analyzer.diagnostics.disabled": ["unresolved-proc-macro"]
+
 }
