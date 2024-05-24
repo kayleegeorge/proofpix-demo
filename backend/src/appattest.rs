@@ -22,27 +22,29 @@ pub async fn validate_attestation(attestation_data: AttestationData) -> &'static
     // let prod_mode: String = env::var("PROD_MODE").expect("PROD_MODE must be set");
     // let prod = if prod_mode == "true" { true } else { false };
 
-    let added = add_challenge(
-        attestation_data.challenge.clone(),
-        attestation_data.attestation_string.clone(),
-    )
-    .await;
+    // let added = add_challenge(
+    //     attestation_data.challenge.clone(),
+    //     attestation_data.attestation_string.clone(),
+    // )
+    // .await;
 
-    if added {
-        println!("Challenge added.");
-    } else {
-        println!("Challenge already exists. Invalid attestation.");
-        return "challenge already exists";
-    }
+    // if added {
+    //     println!("Challenge added.");
+    // } else {
+    //     println!("Challenge already exists. Invalid attestation.");
+    //     return "challenge already exists";
+    // }
 
     // Verify the attestation
+    let prod = true;
+    println!("PROD: {:?}", prod);
     println!("Verifying attestation... {:?}", attestation_data);
     let verified = app_attest::validate_raw_attestation(
         &attestation_data.attestation_string,
         &attestation_data.raw_key_id,
         &attestation_data.challenge,
         &app_id,
-        true,  // production
+        prod,  // production
         false, // leaf_cert_only
     );
 
