@@ -12,13 +12,7 @@ use std::env;
 // Connect to Redis
 pub async fn connect_to_redis() -> redis::RedisResult<redis::Connection> {
     dotenv().ok();
-    let dev = env::var("DEV").expect("DEV must be set");
     let mut redis_url = env::var("REDIS_URL").expect("REDIS_URL must be set");
-
-    if dev == "true" {
-        redis_url = env::var("DEV_REDIS_URL").expect("DEV_REDIS_URL must be set");
-    }
-
     let client = redis::Client::open(redis_url).expect("Failed to connect to Redis");
     let connection = client
         .get_connection()
