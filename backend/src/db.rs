@@ -12,7 +12,7 @@ use std::env;
 // Connect to Redis
 pub async fn connect_to_redis() -> redis::RedisResult<redis::Connection> {
     dotenv().ok();
-    let mut redis_url = env::var("REDIS_URL").expect("REDIS_URL must be set");
+    let redis_url = env::var("REDIS_URL").expect("REDIS_URL must be set");
     let client = redis::Client::open(redis_url).expect("Failed to connect to Redis");
     let connection = client
         .get_connection()
@@ -203,6 +203,9 @@ pub async fn get_all_images() -> Vec<Image> {
         };
         images.push(image);
     }
+
+    // Sort images by timestamp
+    images.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
 
     images
 }
