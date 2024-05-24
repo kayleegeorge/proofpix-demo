@@ -1,5 +1,5 @@
 [global.limits]
-form = "3 MiB"
-"file/jpg" = "3 MiB"
-"file/png" = "3 MiB"
-"file" = "3 MiB"
+form = "5 MiB"
+"file/jpg" = "5 MiB"
+"file/png" = "5 MiB"
+"file" = "5 MiB"
